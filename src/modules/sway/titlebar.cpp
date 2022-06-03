@@ -103,7 +103,7 @@ auto Titlebar::update() -> void {
   int max_shown = config_["max-shown"].isInt() ? config_["max-shown"].asInt() : 5;
   int char_budget = config_["char-budget"].isInt() ? config_["char-budget"].asInt() : 100;
   int penalty_per_entry =
-      config_["penalty-per-entry"].isInt() ? config_["penalty-per-entry"].asInt() : 6;
+      config_["char-penalty-per-entry"].isInt() ? config_["char-penalty-per-entry"].asInt() : 6;
   if (focused_window_idx_ <= max_shown / 2) {
     b_idx_ = 0;
     e_idx_ = (windows_.size() > max_shown) ? b_idx_ + max_shown : windows_.size();
