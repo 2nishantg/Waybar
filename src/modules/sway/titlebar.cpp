@@ -40,8 +40,12 @@ void Titlebar::onEvent(const struct Ipc::ipc_response &res) {
   }
 }
 
+// returns the index of focused window if it exists in this workspace, else -1
 int addWindowsFromCons(Json::Value &cons, std::vector<Json::Value> &windows) {
   int retval = -1;
+  if (!cons.isArray()) {
+    return retval;
+  }
   for (auto it = cons.begin(); it != cons.end(); it++) {
     if (!it->isObject()) {
       spdlog::error("Titlebar: Should not be happening:\n {}", it->toStyledString());
@@ -74,6 +78,7 @@ void Titlebar::onCmd(const struct Ipc::ipc_response &res) {
   if (res.type == IPC_GET_TREE) {
     try {
       {
+        int fwi = 0;
         std::lock_guard<std::mutex> lock(mutex_);
         auto outputs = parser_.parse(res.payload)["nodes"];
         for (auto output = outputs.begin(); output != outputs.end(); output++) {
@@ -82,13 +87,14 @@ void Titlebar::onCmd(const struct Ipc::ipc_response &res) {
           for (auto workspace = workspaces.begin(); workspace != workspaces.end(); workspace++) {
             auto idx = addWindowsFromWorkspace(*workspace, windows_);
             if (idx >= 0) {
-              focused_window_idx_ = idx;
+              fwi = idx;
               offset_ = 0;
               break;
             }
             windows_.clear();
           }
         }
+        focused_window_idx_ = fwi;
       }
       dp.emit();
     } catch (const std::exception &e) {
