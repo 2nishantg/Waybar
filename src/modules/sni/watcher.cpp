@@ -2,6 +2,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include "util/scope_guard.hpp"
+
 using namespace waybar::modules::SNI;
 
 Watcher::Watcher()
@@ -18,7 +20,6 @@ Watcher::~Watcher() {
     g_slist_free_full(hosts_, gfWatchFree);
     hosts_ = nullptr;
   }
-
   if (items_ != nullptr) {
     g_slist_free_full(items_, gfWatchFree);
     items_ = nullptr;
@@ -30,6 +31,11 @@ Watcher::~Watcher() {
 
 void Watcher::busAcquired(const Glib::RefPtr<Gio::DBus::Connection>& conn, Glib::ustring name) {
   GError* error = nullptr;
+  waybar::util::ScopeGuard error_deleter([error]() {
+    if (error) {
+      g_error_free(error);
+    }
+  });
   g_dbus_interface_skeleton_export(G_DBUS_INTERFACE_SKELETON(watcher_), conn->gobj(),
                                    "/StatusNotifierWatcher", &error);
   if (error != nullptr) {
@@ -37,7 +43,6 @@ void Watcher::busAcquired(const Glib::RefPtr<Gio::DBus::Connection>& conn, Glib:
     if (error->code != 2) {
       spdlog::error("Watcher: {}", error->message);
     }
-    g_error_free(error);
     return;
   }
   g_signal_connect_swapped(watcher_, "handle-register-item",
@@ -62,10 +67,9 @@ gboolean Watcher::handleRegisterHost(Watcher* obj, GDBusMethodInvocation* invoca
   }
   auto watch = gfWatchFind(obj->hosts_, bus_name, object_path);
   if (watch != nullptr) {
-    g_dbus_method_invocation_return_error(
-        invocation, G_DBUS_ERROR, G_DBUS_ERROR_INVALID_ARGS,
-        "Status Notifier Host with bus name '%s' and object path '%s' is already registered",
-        bus_name, object_path);
+    g_warning("Status Notifier Host with bus name '%s' and object path '%s' is already registered",
+              bus_name, object_path);
+    sn_watcher_complete_register_item(obj->watcher_, invocation);
     return TRUE;
   }
   watch = gfWatchNew(GF_WATCH_TYPE_HOST, service, bus_name, object_path, obj);

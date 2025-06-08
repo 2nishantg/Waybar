@@ -25,20 +25,24 @@ The *backlight* module displays the current backlight level.
 	The maximum length in characters the module should display.
 
 *min-length*: ++
-    typeof: integer ++
-    The minimum length in characters the module should take up.
+	typeof: integer ++
+	The minimum length in characters the module should accept.
 
 *align*: ++
-    typeof: float ++
-    The alignment of the text, where 0 is left-aligned and 1 is right-aligned. If the module is rotated, it will follow the flow of the text.
+	typeof: float ++
+	The alignment of the label within the module, where 0 is left-aligned and 1 is right-aligned. If the module is rotated, it will follow the flow of the text.
+
+*justify*: ++
+	typeof: string ++
+	The alignment of the text within the module's label, allowing options 'left', 'right', or 'center' to define the positioning.
 
 *rotate*: ++
 	typeof: integer ++
-	Positive value to rotate the text label.
+	Positive value to rotate the text label (in 90 degree increments).
 
 *states*: ++
-	typeof: array ++
-	A number of backlight states which get activated on certain brightness levels.
+	typeof: object ++
+	A number of backlight states which get activated on certain brightness levels. See *waybar-states(5)*.
 
 *on-click*: ++
 	typeof: string ++
@@ -46,11 +50,11 @@ The *backlight* module displays the current backlight level.
 
 *on-click-middle*: ++
 	typeof: string ++
-	Command to execute when middle-clicked on the module using mousewheel.
+	Command to execute when middle-clicked on the module using mouse scroll wheel.
 
 *on-click-right*: ++
 	typeof: string ++
-	Command to execute when the module is right clicked.
+	Command to execute when the module is right-clicked.
 
 *on-update*: ++
 	typeof: string ++
@@ -58,23 +62,55 @@ The *backlight* module displays the current backlight level.
 
 *on-scroll-up*: ++
 	typeof: string ++
-	Command to execute when performing a scroll up on the module.
+	Command to execute when performing a scroll up on the module. This replaces the default behaviour of brightness control.
 
 *on-scroll-down*: ++
 	typeof: string
-	Command to execute when performing a scroll down on the module.
+	Command to execute when performing a scroll down on the module. This replaces the default behaviour of brightness control.
 
 *smooth-scrolling-threshold*: ++
 	typeof: double
 	Threshold to be used when scrolling.
 
+*reverse-scrolling*: ++
+	typeof: bool ++
+	Option to reverse the scroll direction.
+
+*scroll-step*: ++
+	typeof: float ++
+	default: 1.0 ++
+	The speed at which to change the brightness when scrolling.
+
+*min-brightness*: ++
+	typeof: double ++
+	default: 0.0 ++
+	The minimum brightness of the backlight.
+
+*menu*: ++
+	typeof: string ++
+	Action that popups the menu.
+
+*menu-file*: ++
+	typeof: string ++
+	Location of the menu descriptor file. There need to be an element of type
+	GtkMenu with id *menu*
+
+*menu-actions*: ++
+	typeof: array ++
+	The actions corresponding to the buttons of the menu.
+
+*expand*: ++
+	typeof: bool ++
+	default: false ++
+	Enables this module to consume all left over space dynamically.
+
 # EXAMPLE:
 
 ```
 "backlight": {
-    "device": "intel_backlight",
-    "format": "{percent}% {icon}",
-    "format-icons": ["", ""]
+	"device": "intel_backlight",
+	"format": "{percent}% {icon}",
+	"format-icons": ["", ""]
 }
 ```
 

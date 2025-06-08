@@ -13,7 +13,8 @@ std::list<pid_t> reap;
 volatile bool reload;
 
 void* signalThread(void* args) {
-  int err, signum;
+  int err;
+  int signum;
   sigset_t mask;
   sigemptyset(&mask);
   sigaddset(&mask, SIGCHLD);
@@ -46,7 +47,7 @@ void* signalThread(void* args) {
   }
 }
 
-void startSignalThread(void) {
+void startSignalThread() {
   int err;
   sigset_t mask;
   sigemptyset(&mask);
@@ -71,7 +72,7 @@ void startSignalThread(void) {
 
 int main(int argc, char* argv[]) {
   try {
-    auto client = waybar::Client::inst();
+    auto* client = waybar::Client::inst();
 
     std::signal(SIGUSR1, [](int /*signal*/) {
       for (auto& bar : waybar::Client::inst()->bars) {
@@ -82,6 +83,12 @@ int main(int argc, char* argv[]) {
     std::signal(SIGUSR2, [](int /*signal*/) {
       spdlog::info("Reloading...");
       reload = true;
+      waybar::Client::inst()->reset();
+    });
+
+    std::signal(SIGINT, [](int /*signal*/) {
+      spdlog::info("Quitting.");
+      reload = false;
       waybar::Client::inst()->reset();
     });
 
@@ -99,6 +106,10 @@ int main(int argc, char* argv[]) {
       reload = false;
       ret = client->main(argc, argv);
     } while (reload);
+
+    std::signal(SIGUSR1, SIG_IGN);
+    std::signal(SIGUSR2, SIG_IGN);
+    std::signal(SIGINT, SIG_IGN);
 
     delete client;
     return ret;

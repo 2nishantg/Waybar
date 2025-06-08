@@ -24,6 +24,10 @@
 
 namespace waybar::modules::wlr {
 
+struct widget_geometry {
+  int x, y, w, h;
+};
+
 class Taskbar;
 
 class Task {
@@ -40,6 +44,9 @@ class Task {
     FULLSCREEN = (1 << 3),
     INVALID = (1 << 4)
   };
+  // made public so TaskBar can reorder based on configuration.
+  Gtk::Button button;
+  struct widget_geometry minimize_hint;
 
  private:
   static uint32_t global_id;
@@ -53,7 +60,6 @@ class Task {
 
   uint32_t id_;
 
-  Gtk::Button button_;
   Gtk::Box content_;
   Gtk::Image icon_;
   Gtk::Label text_before_;
@@ -74,9 +80,15 @@ class Task {
   std::string app_id_;
   uint32_t state_ = 0;
 
+  int32_t drag_start_x;
+  int32_t drag_start_y;
+  int32_t drag_start_button = -1;
+
  private:
   std::string repr() const;
   std::string state_string(bool = false) const;
+  void set_minimize_hint();
+  void on_button_size_allocated(Gtk::Allocation &alloc);
   void set_app_info_from_app_id_list(const std::string &app_id_list);
   bool image_load_icon(Gtk::Image &image, const Glib::RefPtr<Gtk::IconTheme> &icon_theme,
                        Glib::RefPtr<Gio::DesktopAppInfo> app_info, int size);
@@ -105,6 +117,12 @@ class Task {
 
   /* Callbacks for Gtk events */
   bool handle_clicked(GdkEventButton *);
+  bool handle_button_release(GdkEventButton *);
+  bool handle_motion_notify(GdkEventMotion *);
+  void handle_drag_data_get(const Glib::RefPtr<Gdk::DragContext> &context,
+                            Gtk::SelectionData &selection_data, guint info, guint time);
+  void handle_drag_data_received(const Glib::RefPtr<Gdk::DragContext> &context, int x, int y,
+                                 Gtk::SelectionData selection_data, guint info, guint time);
 
  public:
   bool operator==(const Task &) const;

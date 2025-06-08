@@ -16,13 +16,15 @@
 #include "util/rfkill.hpp"
 #endif
 
+enum ip_addr_pref : uint8_t { IPV4, IPV6, IPV4_6 };
+
 namespace waybar::modules {
 
 class Network : public ALabel {
  public:
   Network(const std::string&, const Json::Value&);
-  ~Network();
-  auto update() -> void;
+  virtual ~Network();
+  auto update() -> void override;
 
  private:
   static const uint8_t MAX_RETRY = 5;
@@ -40,6 +42,7 @@ class Network : public ALabel {
   void parseEssid(struct nlattr**);
   void parseSignal(struct nlattr**);
   void parseFreq(struct nlattr**);
+  void parseBssid(struct nlattr**);
   bool associatedOrJoined(struct nlattr**);
   bool checkInterface(std::string name);
   auto getInfo() -> void;
@@ -49,7 +52,7 @@ class Network : public ALabel {
   std::optional<std::pair<unsigned long long, unsigned long long>> readBandwidthUsage();
 
   int ifid_;
-  sa_family_t family_;
+  ip_addr_pref addr_pref_;
   struct sockaddr_nl nladdr_ = {0};
   struct nl_sock* sock_ = nullptr;
   struct nl_sock* ev_sock_ = nullptr;
@@ -62,22 +65,26 @@ class Network : public ALabel {
   bool want_link_dump_;
   bool want_addr_dump_;
   bool dump_in_progress_;
+  bool is_p2p_;
 
   unsigned long long bandwidth_down_total_;
   unsigned long long bandwidth_up_total_;
 
   std::string state_;
   std::string essid_;
+  std::string bssid_;
   bool carrier_;
   std::string ifname_;
   std::string ipaddr_;
+  std::string ipaddr6_;
   std::string gwaddr_;
   std::string netmask_;
+  std::string netmask6_;
   int cidr_;
+  int cidr6_;
   int32_t signal_strength_dbm_;
   uint8_t signal_strength_;
   std::string signal_strength_app_;
-  float frequency_;
   uint32_t route_priority;
 
   util::SleeperThread thread_;
@@ -85,6 +92,7 @@ class Network : public ALabel {
 #ifdef WANT_RFKILL
   util::Rfkill rfkill_;
 #endif
+  float frequency_;
 };
 
 }  // namespace waybar::modules

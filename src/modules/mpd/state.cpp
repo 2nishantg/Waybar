@@ -10,6 +10,13 @@ namespace waybar::modules {
 }  // namespace waybar::modules
 #endif
 
+#if FMT_VERSION >= 90000
+/* Satisfy fmt 9.x deprecation of implicit conversion of enums to int */
+auto format_as(enum mpd_idle val) {
+  return static_cast<std::underlying_type_t<enum mpd_idle>>(val);
+}
+#endif
+
 namespace waybar::modules::detail {
 
 #define IDLE_RUN_NOIDLE_AND_CMD(...)                                      \
@@ -112,7 +119,7 @@ bool Idle::on_io(Glib::IOCondition const&) {
 
 void Playing::entry() noexcept {
   sigc::slot<bool> timer_slot = sigc::mem_fun(*this, &Playing::on_timer);
-  timer_connection_ = Glib::signal_timeout().connect(timer_slot, /* milliseconds */ 1'000);
+  timer_connection_ = Glib::signal_timeout().connect_seconds(timer_slot, 1);
   spdlog::debug("mpd: Playing: enabled 1 second periodic timer.");
 }
 
@@ -320,14 +327,20 @@ void Stopped::pause() {
 
 void Stopped::update() noexcept { ctx_->do_update(); }
 
-void Disconnected::arm_timer(int interval) noexcept {
+bool Disconnected::arm_timer(int interval) noexcept {
+  // check if it's necessary to modify the timer
+  if (timer_connection_ && last_interval_ == interval) {
+    return true;
+  }
   // unregister timer, if present
   disarm_timer();
 
   // register timer
+  last_interval_ = interval;
   sigc::slot<bool> timer_slot = sigc::mem_fun(*this, &Disconnected::on_timer);
-  timer_connection_ = Glib::signal_timeout().connect(timer_slot, interval);
-  spdlog::debug("mpd: Disconnected: enabled interval timer.");
+  timer_connection_ = Glib::signal_timeout().connect_seconds(timer_slot, interval);
+  spdlog::debug("mpd: Disconnected: enabled {}s interval timer.", interval);
+  return false;
 }
 
 void Disconnected::disarm_timer() noexcept {
@@ -340,7 +353,7 @@ void Disconnected::disarm_timer() noexcept {
 
 void Disconnected::entry() noexcept {
   ctx_->emit();
-  arm_timer(1'000);
+  arm_timer(1 /* second */);
 }
 
 void Disconnected::exit() noexcept { disarm_timer(); }
@@ -369,9 +382,7 @@ bool Disconnected::on_timer() {
     spdlog::warn("mpd: Disconnected: error: {}", e.what());
   }
 
-  arm_timer(ctx_->interval() * 1'000);
-
-  return false;
+  return arm_timer(ctx_->interval());
 }
 
 void Disconnected::update() noexcept { ctx_->do_update(); }

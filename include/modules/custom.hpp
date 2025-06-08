@@ -14,24 +14,28 @@ namespace waybar::modules {
 
 class Custom : public ALabel {
  public:
-  Custom(const std::string&, const std::string&, const Json::Value&);
-  ~Custom();
-  auto update() -> void;
-  void refresh(int /*signal*/);
+  Custom(const std::string&, const std::string&, const Json::Value&, const std::string&);
+  virtual ~Custom();
+  auto update() -> void override;
+  void refresh(int /*signal*/) override;
 
  private:
   void delayWorker();
   void continuousWorker();
+  void waitingWorker();
   void parseOutputRaw();
   void parseOutputJson();
   void handleEvent();
-  bool handleScroll(GdkEventScroll* e);
-  bool handleToggle(GdkEventButton* const& e);
+  bool handleScroll(GdkEventScroll* e) override;
+  bool handleToggle(GdkEventButton* const& e) override;
 
   const std::string name_;
+  const std::string output_name_;
   std::string text_;
+  std::string id_;
   std::string alt_;
   std::string tooltip_;
+  const bool tooltip_format_enabled_;
   std::vector<std::string> class_;
   int percentage_;
   FILE* fp_;

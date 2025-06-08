@@ -14,12 +14,15 @@ namespace waybar::modules {
 class Disk : public ALabel {
  public:
   Disk(const std::string&, const Json::Value&);
-  ~Disk() = default;
-  auto update() -> void;
+  virtual ~Disk() = default;
+  auto update() -> void override;
 
  private:
   util::SleeperThread thread_;
   std::string path_;
+  std::string unit_;
+
+  float calc_specific_divisor(const std::string divisor);
 };
 
 }  // namespace waybar::modules

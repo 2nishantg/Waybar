@@ -74,36 +74,40 @@ Addressed by *mpd*
 	Tooltip information displayed when the MPD server can't be reached.
 
 *artist-len*: ++
-    typeof: integer ++
-    Maximum length of the Artist tag.
+	typeof: integer ++
+	Maximum length of the Artist tag.
 
 *album-len*: ++
-    typeof: integer ++
-    Maximum length of the Album tag.
+	typeof: integer ++
+	Maximum length of the Album tag.
 
 *album-artist-len*: ++
-    typeof: integer ++
-    Maximum length of the Album Artist tag.
+	typeof: integer ++
+	Maximum length of the Album Artist tag.
 
 *title-len*: ++
-    typeof: integer ++
-    Maximum length of the Title tag.
+	typeof: integer ++
+	Maximum length of the Title tag.
 
 *rotate*: ++
 	typeof: integer ++
-	Positive value to rotate the text label.
+	Positive value to rotate the text label (in 90 degree increments).
 
 *max-length*: ++
 	typeof: integer ++
 	The maximum length in character the module should display.
 
 *min-length*: ++
-    typeof: integer ++
-    The minimum length in characters the module should take up.
+	typeof: integer ++
+	The minimum length in characters the module should accept.
 
 *align*: ++
-    typeof: float ++
-    The alignment of the text, where 0 is left-aligned and 1 is right-aligned. If the module is rotated, it will follow the flow of the text.
+	typeof: float ++
+	The alignment of the label within the module, where 0 is left-aligned and 1 is right-aligned. If the module is rotated, it will follow the flow of the text.
+
+*justify*: ++
+	typeof: string ++
+	The alignment of the text within the module's label, allowing options 'left', 'right', or 'center' to define the positioning.
 
 *on-click*: ++
 	typeof: string ++
@@ -115,7 +119,7 @@ Addressed by *mpd*
 
 *on-click-right*: ++
 	typeof: string ++
-	Command to execute when you right clicked on the module.
+	Command to execute when you right-click on the module.
 
 *on-update*: ++
 	typeof: string ++
@@ -158,6 +162,24 @@ Addressed by *mpd*
 	default: {} ++
 	Icon to show depending on the "single" option (*{ "on": "...", "off": "..." }*)
 
+*menu*: ++
+	typeof: string ++
+	Action that popups the menu.
+
+*menu-file*: ++
+	typeof: string ++
+	Location of the menu descriptor file. There need to be an element of type
+	GtkMenu with id *menu*
+
+*menu-actions*: ++
+	typeof: array ++
+	The actions corresponding to the buttons of the menu.
+
+*expand*: ++
+	typeof: bool ++
+	default: false ++
+	Enables this module to consume all left over space dynamically.
+
 # FORMAT REPLACEMENTS
 
 ## WHEN PLAYING/PAUSED
@@ -182,7 +204,7 @@ Addressed by *mpd*
 
 *{queueLength}*: The length of the current queue.
 
-*{stateIcon}*: The icon corresponding the playing or paused status of the player (see *state-icons* option)
+*{stateIcon}*: The icon corresponding to the playing or paused status of the player (see *state-icons* option)
 
 *{consumeIcon}*: The icon corresponding the "consume" option (see *consume-icons* option)
 

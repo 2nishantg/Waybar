@@ -41,7 +41,7 @@ auto Sndio::connect_to_sndio() -> void {
 }
 
 Sndio::Sndio(const std::string &id, const Json::Value &config)
-    : ALabel(config, "sndio", id, "{volume}%", 1),
+    : ALabel(config, "sndio", id, "{volume}%", 1, false, true),
       hdl_(nullptr),
       pfds_(0),
       addr_(0),
@@ -110,7 +110,14 @@ auto Sndio::update() -> void {
     label_.get_style_context()->remove_class("muted");
   }
 
-  label_.set_markup(fmt::format(format, fmt::arg("volume", vol), fmt::arg("raw_value", volume_)));
+  auto text =
+      fmt::format(fmt::runtime(format), fmt::arg("volume", vol), fmt::arg("raw_value", volume_));
+  if (text.empty()) {
+    label_.hide();
+  } else {
+    label_.set_markup(text);
+    label_.show();
+  }
 
   ALabel::update();
 }

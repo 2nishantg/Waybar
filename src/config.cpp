@@ -1,14 +1,16 @@
 #include "config.hpp"
 
-#include <fmt/ostream.h>
 #include <spdlog/spdlog.h>
 #include <unistd.h>
 #include <wordexp.h>
 
+#include <filesystem>
 #include <fstream>
 #include <stdexcept>
 
 #include "util/json.hpp"
+
+namespace fs = std::filesystem;
 
 namespace waybar {
 
@@ -17,26 +19,49 @@ const std::vector<std::string> Config::CONFIG_DIRS = {
     "/etc/xdg/waybar/",         SYSCONFDIR "/xdg/waybar/", "./resources/",
 };
 
-std::optional<std::string> tryExpandPath(const std::string &path) {
+const char *Config::CONFIG_PATH_ENV = "WAYBAR_CONFIG_DIR";
+
+std::vector<std::string> Config::tryExpandPath(const std::string &base,
+                                               const std::string &filename) {
+  fs::path path;
+
+  if (!filename.empty()) {
+    path = fs::path(base) / fs::path(filename);
+  } else {
+    path = fs::path(base);
+  }
+
+  spdlog::debug("Try expanding: {}", path.string());
+
+  std::vector<std::string> results;
   wordexp_t p;
   if (wordexp(path.c_str(), &p, 0) == 0) {
-    if (access(*p.we_wordv, F_OK) == 0) {
-      std::string result = *p.we_wordv;
-      wordfree(&p);
-      return result;
+    for (size_t i = 0; i < p.we_wordc; i++) {
+      if (access(p.we_wordv[i], F_OK) == 0) {
+        results.emplace_back(p.we_wordv[i]);
+        spdlog::debug("Found config file: {}", p.we_wordv[i]);
+      }
     }
     wordfree(&p);
   }
-  return std::nullopt;
+
+  return results;
 }
 
 std::optional<std::string> Config::findConfigPath(const std::vector<std::string> &names,
                                                   const std::vector<std::string> &dirs) {
-  std::vector<std::string> paths;
+  if (const char *dir = std::getenv(Config::CONFIG_PATH_ENV)) {
+    for (const auto &name : names) {
+      if (auto res = tryExpandPath(dir, name); !res.empty()) {
+        return res.front();
+      }
+    }
+  }
+
   for (const auto &dir : dirs) {
     for (const auto &name : names) {
-      if (auto res = tryExpandPath(dir + name); res) {
-        return res;
+      if (auto res = tryExpandPath(dir, name); !res.empty()) {
+        return res.front();
       }
     }
   }
@@ -69,11 +94,15 @@ void Config::resolveConfigIncludes(Json::Value &config, int depth) {
   if (includes.isArray()) {
     for (const auto &include : includes) {
       spdlog::info("Including resource file: {}", include.asString());
-      setupConfig(config, tryExpandPath(include.asString()).value_or(""), ++depth);
+      for (const auto &match : tryExpandPath(include.asString(), "")) {
+        setupConfig(config, match, depth + 1);
+      }
     }
   } else if (includes.isString()) {
     spdlog::info("Including resource file: {}", includes.asString());
-    setupConfig(config, tryExpandPath(includes.asString()).value_or(""), ++depth);
+    for (const auto &match : tryExpandPath(includes.asString(), "")) {
+      setupConfig(config, match, depth + 1);
+    }
   }
 }
 
@@ -102,13 +131,27 @@ bool isValidOutput(const Json::Value &config, const std::string &name,
                    const std::string &identifier) {
   if (config["output"].isArray()) {
     for (auto const &output_conf : config["output"]) {
-      if (output_conf.isString() &&
-          (output_conf.asString() == name || output_conf.asString() == identifier)) {
-        return true;
+      if (output_conf.isString()) {
+        auto config_output = output_conf.asString();
+        if (config_output.substr(0, 1) == "!") {
+          if (config_output.substr(1) == name || config_output.substr(1) == identifier) {
+            return false;
+          }
+
+          continue;
+        }
+        if (config_output == name || config_output == identifier) {
+          return true;
+        }
+        if (config_output.substr(0, 1) == "*") {
+          return true;
+        }
       }
     }
     return false;
-  } else if (config["output"].isString()) {
+  }
+
+  if (config["output"].isString()) {
     auto config_output = config["output"].asString();
     if (!config_output.empty()) {
       if (config_output.substr(0, 1) == "!") {
@@ -128,6 +171,7 @@ void Config::load(const std::string &config) {
   }
   config_file_ = file.value();
   spdlog::info("Using configuration file {}", config_file_);
+  config_ = Json::Value();
   setupConfig(config_, config_file_, 0);
 }
 

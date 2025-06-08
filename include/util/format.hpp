@@ -6,7 +6,7 @@
 class pow_format {
  public:
   pow_format(long long val, std::string&& unit, bool binary = false)
-      : val_(val), unit_(unit), binary_(binary){};
+      : val_(val), unit_(unit), binary_(binary) {};
 
   long long val_;
   std::string unit_;
@@ -45,7 +45,7 @@ struct formatter<pow_format> {
   }
 
   template <class FormatContext>
-  auto format(const pow_format& s, FormatContext& ctx) -> decltype(ctx.out()) {
+  auto format(const pow_format& s, FormatContext& ctx) const -> decltype(ctx.out()) {
     const char* units[] = {"", "k", "M", "G", "T", "P", nullptr};
 
     auto base = s.binary_ ? 1024ull : 1000ll;
@@ -56,28 +56,30 @@ struct formatter<pow_format> {
       fraction /= base;
     }
 
-    auto max_width = 4            // coeff in {:.3g} format
-                     + 1          // prefix from units array
-                     + s.binary_  // for the 'i' in GiB.
+    auto number_width = 5              // coeff in {:.1f} format
+                        + s.binary_;   // potential 4th digit before the decimal point
+    auto max_width = number_width + 1  // prefix from units array
+                     + s.binary_       // for the 'i' in GiB.
                      + s.unit_.length();
 
     const char* format;
     std::string string;
     switch (spec) {
       case '>':
-        return format_to(ctx.out(), "{:>{}}", fmt::format("{}", s), max_width);
+        return fmt::format_to(ctx.out(), "{:>{}}", fmt::format("{}", s), max_width);
       case '<':
-        return format_to(ctx.out(), "{:<{}}", fmt::format("{}", s), max_width);
+        return fmt::format_to(ctx.out(), "{:<{}}", fmt::format("{}", s), max_width);
       case '=':
-        format = "{coefficient:<4.3g}{padding}{prefix}{unit}";
+        format = "{coefficient:<{number_width}.1f}{padding}{prefix}{unit}";
         break;
       case 0:
       default:
-        format = "{coefficient:.3g}{prefix}{unit}";
+        format = "{coefficient:.1f}{prefix}{unit}";
         break;
     }
-    return format_to(
-        ctx.out(), format, fmt::arg("coefficient", fraction),
+    return fmt::format_to(
+        ctx.out(), fmt::runtime(format), fmt::arg("coefficient", fraction),
+        fmt::arg("number_width", number_width),
         fmt::arg("prefix", std::string() + units[pow] + ((s.binary_ && pow) ? "i" : "")),
         fmt::arg("unit", s.unit_),
         fmt::arg("padding", pow         ? ""
@@ -90,8 +92,8 @@ struct formatter<pow_format> {
 template <>
 struct formatter<Glib::ustring> : formatter<std::string> {
   template <typename FormatContext>
-  auto format(const Glib::ustring& value, FormatContext& ctx) {
-    return formatter<std::string>::format(value, ctx);
+  auto format(const Glib::ustring& value, FormatContext& ctx) const {
+    return formatter<std::string>::format(static_cast<std::string>(value), ctx);
   }
 };
 }  // namespace fmt

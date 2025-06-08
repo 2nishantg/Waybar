@@ -12,12 +12,13 @@ namespace waybar::modules {
 class Temperature : public ALabel {
  public:
   Temperature(const std::string&, const Json::Value&);
-  ~Temperature() = default;
-  auto update() -> void;
+  virtual ~Temperature() = default;
+  auto update() -> void override;
 
  private:
   float getTemperature();
   bool isCritical(uint16_t);
+  bool isWarning(uint16_t);
 
   std::string file_path_;
   util::SleeperThread thread_;

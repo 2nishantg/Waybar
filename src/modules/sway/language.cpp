@@ -19,6 +19,7 @@ const std::string Language::XKB_ACTIVE_LAYOUT_NAME_KEY = "xkb_active_layout_name
 
 Language::Language(const std::string& id, const Json::Value& config)
     : ALabel(config, "language", id, "{}", 0, true) {
+  hide_single_ = config["hide-single-layout"].isBool() && config["hide-single-layout"].asBool();
   is_variant_displayed = format_.find("{variant}") != std::string::npos;
   if (format_.find("{}") != std::string::npos || format_.find("{short}") != std::string::npos) {
     displayed_short_flag |= static_cast<std::byte>(DispayedShortFlag::ShortName);
@@ -95,15 +96,19 @@ void Language::onEvent(const struct Ipc::ipc_response& res) {
 
 auto Language::update() -> void {
   std::lock_guard<std::mutex> lock(mutex_);
+  if (hide_single_ && layouts_map_.size() <= 1) {
+    event_box_.hide();
+    return;
+  }
   auto display_layout = trim(fmt::format(
-      format_, fmt::arg("short", layout_.short_name),
+      fmt::runtime(format_), fmt::arg("short", layout_.short_name),
       fmt::arg("shortDescription", layout_.short_description), fmt::arg("long", layout_.full_name),
       fmt::arg("variant", layout_.variant), fmt::arg("flag", layout_.country_flag())));
   label_.set_markup(display_layout);
   if (tooltipEnabled()) {
     if (tooltip_format_ != "") {
       auto tooltip_display_layout = trim(
-          fmt::format(tooltip_format_, fmt::arg("short", layout_.short_name),
+          fmt::format(fmt::runtime(tooltip_format_), fmt::arg("short", layout_.short_name),
                       fmt::arg("shortDescription", layout_.short_description),
                       fmt::arg("long", layout_.full_name), fmt::arg("variant", layout_.variant),
                       fmt::arg("flag", layout_.country_flag())));
@@ -120,7 +125,9 @@ auto Language::update() -> void {
 }
 
 auto Language::set_current_layout(std::string current_layout) -> void {
+  label_.get_style_context()->remove_class(layout_.short_name);
   layout_ = layouts_map_[current_layout];
+  label_.get_style_context()->add_class(layout_.short_name);
 }
 
 auto Language::init_layouts_map(const std::vector<std::string>& used_layouts) -> void {

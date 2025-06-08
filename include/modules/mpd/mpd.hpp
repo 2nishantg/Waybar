@@ -37,10 +37,11 @@ class MPD : public ALabel {
  public:
   MPD(const std::string&, const Json::Value&);
   virtual ~MPD() noexcept = default;
-  auto update() -> void;
+  auto update() -> void override;
 
  private:
   std::string getTag(mpd_tag_type type, unsigned idx = 0) const;
+  std::string getFilename() const;
   void setLabel();
   std::string getStateIcon() const;
   std::string getOptionIcon(std::string optionName, bool activated) const;

@@ -12,7 +12,7 @@ Titlebar::Titlebar(const std::string &id, const Bar &bar, const Json::Value &con
     : AModule(config, "titlebar", id, false, true),
       bar_(bar),
       offset_(0),
-      box_(bar.vertical ? Gtk::ORIENTATION_VERTICAL : Gtk::ORIENTATION_HORIZONTAL, 0) {
+      box_(Gtk::ORIENTATION_HORIZONTAL, 0) {
   box_.set_name("titlebar");
   if (!id.empty()) {
     box_.get_style_context()->add_class(id);

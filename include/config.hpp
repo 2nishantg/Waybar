@@ -14,10 +14,14 @@ namespace waybar {
 class Config {
  public:
   static const std::vector<std::string> CONFIG_DIRS;
+  static const char *CONFIG_PATH_ENV;
 
   /* Try to find any of provided names in the supported set of config directories */
   static std::optional<std::string> findConfigPath(
       const std::vector<std::string> &names, const std::vector<std::string> &dirs = CONFIG_DIRS);
+
+  static std::vector<std::string> tryExpandPath(const std::string &base,
+                                                const std::string &filename);
 
   Config() = default;
 

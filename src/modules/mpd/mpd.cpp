@@ -4,6 +4,10 @@
 #include <glibmm/ustring.h>
 #include <spdlog/spdlog.h>
 
+#include <system_error>
+#include <util/sanitize_str.hpp>
+using namespace waybar::util;
+
 #include "modules/mpd/state.hpp"
 #if defined(MPD_NOINLINE)
 namespace waybar::modules {
@@ -12,7 +16,7 @@ namespace waybar::modules {
 #endif
 
 waybar::modules::MPD::MPD(const std::string& id, const Json::Value& config)
-    : ALabel(config, "mpd", id, "{album} - {artist} - {title}", 5),
+    : ALabel(config, "mpd", id, "{album} - {artist} - {title}", 5, false, true),
       module_name_(id.empty() ? "mpd" : "mpd#" + id),
       server_(nullptr),
       port_(config_["port"].isUInt() ? config["port"].asUInt() : 0),
@@ -49,10 +53,10 @@ auto waybar::modules::MPD::update() -> void {
 
 void waybar::modules::MPD::queryMPD() {
   if (connection_ != nullptr) {
-    spdlog::debug("{}: fetching state information", module_name_);
+    spdlog::trace("{}: fetching state information", module_name_);
     try {
       fetchState();
-      spdlog::debug("{}: fetch complete", module_name_);
+      spdlog::trace("{}: fetch complete", module_name_);
     } catch (std::exception const& e) {
       spdlog::error("{}: {}", module_name_, e.what());
       state_ = MPD_STATE_UNKNOWN;
@@ -73,6 +77,16 @@ std::string waybar::modules::MPD::getTag(mpd_tag_type type, unsigned idx) const 
   return result;
 }
 
+std::string waybar::modules::MPD::getFilename() const {
+  std::string path = mpd_song_get_uri(song_.get());
+  size_t position = path.find_last_of("/");
+  if (position == std::string::npos) {
+    return path;
+  } else {
+    return path.substr(position + 1);
+  }
+}
+
 void waybar::modules::MPD::setLabel() {
   if (connection_ == nullptr) {
     label_.get_style_context()->add_class("disconnected");
@@ -83,7 +97,12 @@ void waybar::modules::MPD::setLabel() {
     auto format = config_["format-disconnected"].isString()
                       ? config_["format-disconnected"].asString()
                       : "disconnected";
-    label_.set_markup(format);
+    if (format.empty()) {
+      label_.set_markup(format);
+      label_.show();
+    } else {
+      label_.hide();
+    }
 
     if (tooltipEnabled()) {
       std::string tooltip_format;
@@ -94,18 +113,19 @@ void waybar::modules::MPD::setLabel() {
       label_.set_tooltip_text(tooltip_format);
     }
     return;
-  } else {
-    label_.get_style_context()->remove_class("disconnected");
   }
+  label_.get_style_context()->remove_class("disconnected");
 
   auto format = format_;
   Glib::ustring artist, album_artist, album, title;
-  std::string date;
+  std::string date, filename;
   int song_pos = 0, queue_length = 0, volume = 0;
   std::chrono::seconds elapsedTime, totalTime;
 
   std::string stateIcon = "";
-  if (stopped()) {
+  bool no_song = song_.get() == nullptr;
+  if (stopped() || no_song) {
+    if (no_song) spdlog::warn("Bug in mpd: no current song but state is not stopped.");
     format =
         config_["format-stopped"].isString() ? config_["format-stopped"].asString() : "stopped";
     label_.get_style_context()->add_class("stopped");
@@ -125,11 +145,12 @@ void waybar::modules::MPD::setLabel() {
 
     stateIcon = getStateIcon();
 
-    artist = getTag(MPD_TAG_ARTIST);
-    album_artist = getTag(MPD_TAG_ALBUM_ARTIST);
-    album = getTag(MPD_TAG_ALBUM);
-    title = getTag(MPD_TAG_TITLE);
-    date = getTag(MPD_TAG_DATE);
+    artist = sanitize_string(getTag(MPD_TAG_ARTIST));
+    album_artist = sanitize_string(getTag(MPD_TAG_ALBUM_ARTIST));
+    album = sanitize_string(getTag(MPD_TAG_ALBUM));
+    title = sanitize_string(getTag(MPD_TAG_TITLE));
+    date = sanitize_string(getTag(MPD_TAG_DATE));
+    filename = sanitize_string(getFilename());
     song_pos = mpd_status_get_song_pos(status_.get()) + 1;
     volume = mpd_status_get_volume(status_.get());
     if (volume < 0) {
@@ -155,17 +176,21 @@ void waybar::modules::MPD::setLabel() {
   if (config_["title-len"].isInt()) title = title.substr(0, config_["title-len"].asInt());
 
   try {
-    label_.set_markup(
-        fmt::format(format, fmt::arg("artist", Glib::Markup::escape_text(artist).raw()),
-                    fmt::arg("albumArtist", Glib::Markup::escape_text(album_artist).raw()),
-                    fmt::arg("album", Glib::Markup::escape_text(album).raw()),
-                    fmt::arg("title", Glib::Markup::escape_text(title).raw()),
-                    fmt::arg("date", Glib::Markup::escape_text(date).raw()),
-                    fmt::arg("volume", volume), fmt::arg("elapsedTime", elapsedTime),
-                    fmt::arg("totalTime", totalTime), fmt::arg("songPosition", song_pos),
-                    fmt::arg("queueLength", queue_length), fmt::arg("stateIcon", stateIcon),
-                    fmt::arg("consumeIcon", consumeIcon), fmt::arg("randomIcon", randomIcon),
-                    fmt::arg("repeatIcon", repeatIcon), fmt::arg("singleIcon", singleIcon)));
+    auto text = fmt::format(
+        fmt::runtime(format), fmt::arg("artist", artist.raw()),
+        fmt::arg("albumArtist", album_artist.raw()), fmt::arg("album", album.raw()),
+        fmt::arg("title", title.raw()), fmt::arg("date", date), fmt::arg("volume", volume),
+        fmt::arg("elapsedTime", elapsedTime), fmt::arg("totalTime", totalTime),
+        fmt::arg("songPosition", song_pos), fmt::arg("queueLength", queue_length),
+        fmt::arg("stateIcon", stateIcon), fmt::arg("consumeIcon", consumeIcon),
+        fmt::arg("randomIcon", randomIcon), fmt::arg("repeatIcon", repeatIcon),
+        fmt::arg("singleIcon", singleIcon), fmt::arg("filename", filename));
+    if (text.empty()) {
+      label_.hide();
+    } else {
+      label_.show();
+      label_.set_markup(text);
+    }
   } catch (fmt::format_error const& e) {
     spdlog::warn("mpd: format error: {}", e.what());
   }
@@ -176,7 +201,7 @@ void waybar::modules::MPD::setLabel() {
                                                           : "MPD (connected)";
     try {
       auto tooltip_text =
-          fmt::format(tooltip_format, fmt::arg("artist", artist.raw()),
+          fmt::format(fmt::runtime(tooltip_format), fmt::arg("artist", artist.raw()),
                       fmt::arg("albumArtist", album_artist.raw()), fmt::arg("album", album.raw()),
                       fmt::arg("title", title.raw()), fmt::arg("date", date),
                       fmt::arg("volume", volume), fmt::arg("elapsedTime", elapsedTime),
@@ -230,6 +255,21 @@ std::string waybar::modules::MPD::getOptionIcon(std::string optionName, bool act
   }
 }
 
+static bool isServerUnavailable(const std::error_code& ec) {
+  if (ec.category() == std::system_category()) {
+    switch (ec.value()) {
+      case ECONNREFUSED:
+      case ECONNRESET:
+      case ENETDOWN:
+      case ENETUNREACH:
+      case EHOSTDOWN:
+      case ENOENT:
+        return true;
+    }
+  }
+  return false;
+}
+
 void waybar::modules::MPD::tryConnect() {
   if (connection_ != nullptr) {
     return;
@@ -257,6 +297,11 @@ void waybar::modules::MPD::tryConnect() {
       }
       checkErrors(connection_.get());
     }
+  } catch (std::system_error& e) {
+    /* Tone down logs if it's likely that the mpd server is not running */
+    auto level = isServerUnavailable(e.code()) ? spdlog::level::debug : spdlog::level::err;
+    spdlog::log(level, "{}: Failed to connect to MPD: {}", module_name_, e.what());
+    connection_.reset();
   } catch (std::runtime_error& e) {
     spdlog::error("{}: Failed to connect to MPD: {}", module_name_, e.what());
     connection_.reset();
@@ -274,6 +319,12 @@ void waybar::modules::MPD::checkErrors(mpd_connection* conn) {
       connection_.reset();
       state_ = MPD_STATE_UNKNOWN;
       throw std::runtime_error("Connection to MPD closed");
+    case MPD_ERROR_SYSTEM:
+      if (auto ec = mpd_connection_get_system_error(conn); ec != 0) {
+        mpd_connection_clear_error(conn);
+        throw std::system_error(ec, std::system_category());
+      }
+      G_GNUC_FALLTHROUGH;
     default:
       if (conn) {
         auto error_message = mpd_connection_get_error_message(conn);

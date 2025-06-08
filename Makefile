@@ -3,11 +3,11 @@
 default: build
 
 build:
-	meson build
+	meson setup build
 	ninja -C build
 
 build-debug:
-	meson build --buildtype=debug
+	meson setup build --buildtype=debug
 	ninja -C build
 
 install: build
@@ -18,6 +18,10 @@ run: build
 
 debug-run: build-debug
 	./build/waybar --log-level debug
+
+test:
+	meson test -C build --no-rebuild --verbose --suite waybar
+.PHONY: test
 
 clean:
 	rm -rf build
